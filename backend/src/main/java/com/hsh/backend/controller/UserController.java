@@ -1,0 +1,82 @@
+package com.hsh.backend.controller;
+
+import com.hsh.backend.common.BaseResponse;
+import com.hsh.backend.common.ResultUtils;
+import com.hsh.backend.model.request.UserLoginRequest;
+import com.hsh.backend.model.request.UserRegisterRequest;
+import com.hsh.backend.model.entity.User;
+import com.hsh.backend.service.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Log4j2
+@Tag(name = "UserController")
+@RestController
+@RequestMapping("/user")
+public class UserController {
+
+    final
+    UserService userService;
+
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
+
+    /**
+     * 用户注册
+     *
+     * @param UserRegisterRequest
+     * @return
+     */
+    @PostMapping("/register")
+    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest UserRegisterRequest) {
+        long res = userService.userRegister(UserRegisterRequest);
+        return ResultUtils.success(res, "用户注册成功");
+    }
+
+    @PostMapping("/login")
+    public BaseResponse<User> userLogin(@RequestBody UserLoginRequest UserLoginRequest, HttpServletRequest request) {
+        User user = userService.userLogin(UserLoginRequest, request);
+        return ResultUtils.success(user);
+    }
+
+    @PostMapping("/logout")
+    public BaseResponse<Long> userLogout(HttpServletRequest request) {
+        long res = userService.userLogout(request);
+        return ResultUtils.success(res);
+    }
+
+    @GetMapping("/current")
+    public BaseResponse<User> getCurrent(HttpServletRequest request) {
+        User current = userService.getCurrent(request);
+        return ResultUtils.success(current);
+    }
+
+    @GetMapping("/search")
+    public BaseResponse<List<User>> searchUsers(String userAccount, HttpServletRequest request) {
+        List<User> list=userService.searchUsers(userAccount,request);
+        return ResultUtils.success(list);
+    }
+
+    @PostMapping("/delet")
+    public BaseResponse<Long> deleteUser(@RequestBody Long id , HttpServletRequest request){
+        Long res=userService.deleteUser(id,request);
+        return ResultUtils.success(res);
+    }
+
+    @PostMapping("/add/tags")
+    public BaseResponse<Long> addTags(@RequestBody List<String> tags, HttpServletRequest request){
+        Long res=userService.addTags(tags,request);
+        return ResultUtils.success(res);
+    }
+//    @GetMapping("/test")
+//    public String test(){
+//        log.error("测试");
+//        System.out.println("hello");
+//        return "12345";
+//    }
+}
