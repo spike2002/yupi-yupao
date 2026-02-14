@@ -20,10 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static com.hsh.backend.constant.UserConstant.ADMIN_ROLE;
 import static com.hsh.backend.constant.UserConstant.USER_LOGIN_STATE;
@@ -196,15 +193,58 @@ public class UserServiceImpl implements UserService {
         User loginuser = this.getCurrent(request);
         String tagstr = loginuser.getTags();
         Gson gson = new Gson();
-        Set<String> tempUserTagsSet = gson.fromJson(tagstr, new TypeToken<Set<String>>(){}.getType());
-        tempUserTagsSet= Optional.ofNullable(tempUserTagsSet).orElse(new HashSet<>());
+        Set<String> tempUserTagsSet = gson.fromJson(tagstr, new TypeToken<Set<String>>() {
+        }.getType());
+        tempUserTagsSet = Optional.ofNullable(tempUserTagsSet).orElse(new HashSet<>());
         tempUserTagsSet.addAll(tags);
         loginuser.setTags(gson.toJson(tempUserTagsSet));
         return (long) userMapper.updateById(loginuser);
     }
 
+    @Override
+    public Long deleteTags(List<String> tags, HttpServletRequest request) {
+        if (request == null || tags == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginuser = this.getCurrent(request);
+        String tagstr = loginuser.getTags();
+        Gson gson = new Gson();
+        Set<String> tempUserTagsSet = gson.fromJson(tagstr, new TypeToken<Set<String>>() {
+        }.getType());
+        tempUserTagsSet = Optional.ofNullable(tempUserTagsSet).orElse(new HashSet<>());
+        for (String tag : tags) {
+            tempUserTagsSet.remove(tag);
+        }
+        loginuser.setTags(gson.toJson(tempUserTagsSet));
+        return (long) userMapper.updateById(loginuser);
+    }
+
+    @Override
+    public int updateuser(User user, HttpServletRequest request) {
+        if (user == null || request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginuser = this.getCurrent(request);
+        if (!isAdmin(loginuser) && !Objects.equals(loginuser.getUserId(), user.getUserId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH);
+        }
+        Long userId = user.getUserId();
+        if (userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User oldUse = userMapper.selectById(user.getUserId());
+        if (oldUse == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "要修改的用户不存在");
+        }
+        return userMapper.updateById(user);
+    }
+
     private boolean isAdmin(HttpServletRequest request) {
         User user = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        return user != null && user.getUserRole() == ADMIN_ROLE;
+    }
+
+    private boolean isAdmin(User user) {
         return user != null && user.getUserRole() == ADMIN_ROLE;
     }
 

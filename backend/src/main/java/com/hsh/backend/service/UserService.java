@@ -27,4 +27,8 @@ public interface UserService {
     Long deleteUser(Long id, HttpServletRequest request);
 
     Long addTags(List<String> tags, HttpServletRequest request);
+
+    Long deleteTags(List<String> tags, HttpServletRequest request);
+
+    int updateuser(User user, HttpServletRequest request);
 }

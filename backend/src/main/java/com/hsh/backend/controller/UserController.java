@@ -73,6 +73,20 @@ public class UserController {
         Long res=userService.addTags(tags,request);
         return ResultUtils.success(res);
     }
+
+    @PostMapping("/delete/tags")
+    public BaseResponse<Long> deleteTags(@RequestBody List<String> tags, HttpServletRequest request){
+        Long res=userService.deleteTags(tags,request);
+        return ResultUtils.success(res);
+    }
+
+    @PostMapping("update")
+    //todo session在前端是怎么保存的，在后端是怎么保存的，request里面都存的什么
+    //todo 更新完了之后前端存的用户信息是不是还是浏览器缓存的用户信息，该怎么解决
+    public BaseResponse<Integer> updateUser(@RequestBody User user,HttpServletRequest request){
+        int res=userService.updateuser(user,request);
+        return ResultUtils.success(res);
+    }
 //    @GetMapping("/test")
 //    public String test(){
 //        log.error("测试");
