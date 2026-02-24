@@ -1,6 +1,9 @@
 package com.hsh.backend.service.impl;
 
+import java.util.Date;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -10,6 +13,7 @@ import com.hsh.backend.model.request.UserRegisterRequest;
 import com.hsh.backend.model.entity.User;
 import com.hsh.backend.exception.BusinessException;
 import com.hsh.backend.mapper.UserMapper;
+import com.hsh.backend.model.request.UserUpdateRequest;
 import com.hsh.backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -130,7 +134,7 @@ public class UserServiceImpl implements UserService {
             return null;
         }
         User safeUser = getSafeUser(user);
-        request.getSession().setAttribute(USER_LOGIN_STATE, safeUser);
+        request.getSession().setAttribute(USER_LOGIN_STATE, user.getUserId());
         return safeUser;
     }
 
@@ -148,11 +152,11 @@ public class UserServiceImpl implements UserService {
         if (request == null) {
             throw new BusinessException(ErrorCode.NULL_ERROR);
         }
-        User user = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
-        if (user == null) {
+        Long userId = (Long) request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (userId == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
-        return user;
+        return getSafeUser(userMapper.selectById(userId));
     }
 
     @Override
@@ -220,27 +224,59 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public int updateuser(User user, HttpServletRequest request) {
-        if (user == null || request == null) {
+    public User updateUserByMe(UserUpdateRequest userUpdateRequest, HttpServletRequest request) {
+        if (userUpdateRequest == null || request == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        User loginuser = this.getCurrent(request);
-        if (!isAdmin(loginuser) && !Objects.equals(loginuser.getUserId(), user.getUserId())) {
-            throw new BusinessException(ErrorCode.NO_AUTH);
+        User toUpdate = new User();
+        Long userId = (Long) request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (userId == null || userId < 0) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
-        Long userId = user.getUserId();
-        if (userId <= 0) {
+        toUpdate.setUserId(userId);
+        toUpdate.setUserName(userUpdateRequest.getUserName());
+        toUpdate.setUserAccount(userUpdateRequest.getUserAccount());
+        toUpdate.setPhone(userUpdateRequest.getPhone());
+        toUpdate.setEmail(userUpdateRequest.getEmail());
+        int rows = userMapper.updateById(toUpdate);
+        if (rows <= 0) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "修改失败");
+        }
+        return getSafeUser(userMapper.selectById(userId));
+    }
+
+    @Override
+    public User updateUserByAdmin(UserUpdateRequest userUpdateRequest, Long id, HttpServletRequest request) {
+        if (userUpdateRequest == null || id == null || request == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        User oldUse = userMapper.selectById(user.getUserId());
-        if (oldUse == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "要修改的用户不存在");
+        User toUpdate = new User();
+        Long userId = (Long) request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (userId == null || userId < 0) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
-        return userMapper.updateById(user);
+        if(!isAdmin(request)){
+            throw new BusinessException(ErrorCode.NO_AUTH,"无权限");
+        }
+        toUpdate.setUserId(id);
+        toUpdate.setUserName(userUpdateRequest.getUserName());
+        toUpdate.setUserAccount(userUpdateRequest.getUserAccount());
+        toUpdate.setPhone(userUpdateRequest.getPhone());
+        toUpdate.setEmail(userUpdateRequest.getEmail());
+        int rows = userMapper.updateById(toUpdate);
+        if (rows <= 0) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "修改失败");
+        }
+        return getSafeUser(userMapper.selectById(id));
+    }
+
+    @Override
+    public Page<User> recommend(long pageSize, long pageNum, HttpServletRequest request) {
+        return null;
     }
 
     private boolean isAdmin(HttpServletRequest request) {
-        User user = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        User user = this.getCurrent(request);
         return user != null && user.getUserRole() == ADMIN_ROLE;
     }
 

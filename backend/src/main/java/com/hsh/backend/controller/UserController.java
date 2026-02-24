@@ -1,10 +1,12 @@
 package com.hsh.backend.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hsh.backend.common.BaseResponse;
 import com.hsh.backend.common.ResultUtils;
 import com.hsh.backend.model.request.UserLoginRequest;
 import com.hsh.backend.model.request.UserRegisterRequest;
 import com.hsh.backend.model.entity.User;
+import com.hsh.backend.model.request.UserUpdateRequest;
 import com.hsh.backend.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -58,34 +60,40 @@ public class UserController {
 
     @GetMapping("/search")
     public BaseResponse<List<User>> searchUsers(String userAccount, HttpServletRequest request) {
-        List<User> list=userService.searchUsers(userAccount,request);
+        List<User> list = userService.searchUsers(userAccount, request);
         return ResultUtils.success(list);
     }
 
     @PostMapping("/delet")
-    public BaseResponse<Long> deleteUser(@RequestBody Long id , HttpServletRequest request){
-        Long res=userService.deleteUser(id,request);
+    public BaseResponse<Long> deleteUser(@RequestBody Long id, HttpServletRequest request) {
+        Long res = userService.deleteUser(id, request);
         return ResultUtils.success(res);
     }
 
     @PostMapping("/add/tags")
-    public BaseResponse<Long> addTags(@RequestBody List<String> tags, HttpServletRequest request){
-        Long res=userService.addTags(tags,request);
+    public BaseResponse<Long> addTags(@RequestBody List<String> tags, HttpServletRequest request) {
+        Long res = userService.addTags(tags, request);
         return ResultUtils.success(res);
     }
 
     @PostMapping("/delete/tags")
-    public BaseResponse<Long> deleteTags(@RequestBody List<String> tags, HttpServletRequest request){
-        Long res=userService.deleteTags(tags,request);
+    public BaseResponse<Long> deleteTags(@RequestBody List<String> tags, HttpServletRequest request) {
+        Long res = userService.deleteTags(tags, request);
         return ResultUtils.success(res);
     }
 
     @PostMapping("update")
-    //todo session在前端是怎么保存的，在后端是怎么保存的，request里面都存的什么
-    //todo 更新完了之后前端存的用户信息是不是还是浏览器缓存的用户信息，该怎么解决
-    public BaseResponse<Integer> updateUser(@RequestBody User user,HttpServletRequest request){
-        int res=userService.updateuser(user,request);
-        return ResultUtils.success(res);
+    // todo session在前端是怎么保存的，在后端是怎么保存的，request里面都存的什么
+    // todo 更新完了之后前端存的用户信息是不是还是浏览器缓存的用户信息，该怎么解决
+    public BaseResponse<User> updateUserByMe(@RequestBody UserUpdateRequest userUpdateRequest, HttpServletRequest request) {
+        User user = userService.updateUserByMe(userUpdateRequest, request);
+        return ResultUtils.success(user);
+    }
+
+    @PostMapping("/update/admin")
+    public BaseResponse<User> updateAdminByAdmin(@RequestBody UserUpdateRequest userUpdateRequest, @RequestParam Long id, HttpServletRequest request) {
+        User user = userService.updateUserByAdmin(userUpdateRequest, id, request);
+        return ResultUtils.success(user);
     }
 //    @GetMapping("/test")
 //    public String test(){
@@ -93,4 +101,10 @@ public class UserController {
 //        System.out.println("hello");
 //        return "12345";
 //    }
+
+    @GetMapping("/recommend")
+    public BaseResponse<Page<User>> recommend(long pageSize,long pageNum,HttpServletRequest request){
+        Page<User> userPage=userService.recommend(pageSize,pageNum,request);
+        return ResultUtils.success(userPage);
+    }
 }
