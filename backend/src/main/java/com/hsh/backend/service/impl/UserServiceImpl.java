@@ -15,16 +15,23 @@ import com.hsh.backend.exception.BusinessException;
 import com.hsh.backend.mapper.UserMapper;
 import com.hsh.backend.model.request.UserUpdateRequest;
 import com.hsh.backend.service.UserService;
+import com.hsh.backend.utils.MinDistance;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.hsh.backend.constant.UserConstant.ADMIN_ROLE;
 import static com.hsh.backend.constant.UserConstant.USER_LOGIN_STATE;
@@ -42,6 +49,8 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private static final String SALT = "hsh";
     private final ObjectMapper objectMapper;
+    private final RedisTemplate<Object, Object> redisTemplate;
+    private static final Gson gson = new Gson();
 //构造函数和@RequiredArgsConstructor冲突，因为@RequiredArgsConstructor注解会扫描final字段并自动生成构造函数，相同的构造函数会造成冲突
 //    public UserServiceImpl(UserMapper userMapper) {
 //        this.userMapper = userMapper;
@@ -175,6 +184,64 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<User> searchUsersByTags(List<String> tags, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            throw new BusinessException(ErrorCode.NO_AUTH, "用户未登录或无权限");
+        }
+        if (tags == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        for (String tag : tags) {
+            userQueryWrapper.like("tags", tag);
+        }
+        //其实写到这里也可以了，这样就是模糊查询，比如搜java会出来javascript，下面的话就是完全匹配查询
+        List<User> userList = userMapper.selectList(userQueryWrapper);
+        userList.stream().filter(user -> {
+            HashSet<User> tempSet = gson.fromJson(user.getTags(), new TypeToken<Set<String>>() {
+            }.getType());
+            return tempSet.containsAll(tags);
+        }).map(this::getSafeUser).toList();
+        return userList;
+    }
+
+    /**
+     * 根据用户tag相似度返回匹配用户
+     *
+     * @param num
+     * @param request
+     * @return
+     */
+    @Override
+    public List<User> match(Integer num, HttpServletRequest request) {
+        if (num == null || request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        if (num < 1 || num > 10) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "匹配用户数量不符合要求");
+        }
+        User loginUser = getCurrent(request);
+        List<String> loginUserTags = gson.fromJson(loginUser.getTags(), new TypeToken<List<String>>() {
+        }.getType());
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+//        userQueryWrapper.select("user_id", "tags");
+        userQueryWrapper.isNotNull("tags");
+        List<User> userList = userMapper.selectList(userQueryWrapper);
+        List<Pair<User, Integer>> list = new ArrayList<>();
+        for (User user : userList) {
+            List<String> tags = gson.fromJson(user.getTags(), new TypeToken<List<String>>() {
+            }.getType());
+            int distance = MinDistance.getMinDistance(tags, loginUserTags);
+            list.add(Pair.of(user, distance));
+        }
+        //返回编辑距离从小到大排序的结果
+        List<User> resList = list.stream().sorted((a, b) -> {
+            return a.getSecond() - b.getSecond();
+        }).map(Pair::getFirst).map(this::getSafeUser).limit(num).toList();
+        return resList;
+    }
+
+    @Override
     public Long deleteUser(Long id, HttpServletRequest request) {
         if (!isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH);
@@ -196,7 +263,6 @@ public class UserServiceImpl implements UserService {
         }
         User loginuser = this.getCurrent(request);
         String tagstr = loginuser.getTags();
-        Gson gson = new Gson();
         Set<String> tempUserTagsSet = gson.fromJson(tagstr, new TypeToken<Set<String>>() {
         }.getType());
         tempUserTagsSet = Optional.ofNullable(tempUserTagsSet).orElse(new HashSet<>());
@@ -212,7 +278,6 @@ public class UserServiceImpl implements UserService {
         }
         User loginuser = this.getCurrent(request);
         String tagstr = loginuser.getTags();
-        Gson gson = new Gson();
         Set<String> tempUserTagsSet = gson.fromJson(tagstr, new TypeToken<Set<String>>() {
         }.getType());
         tempUserTagsSet = Optional.ofNullable(tempUserTagsSet).orElse(new HashSet<>());
@@ -255,8 +320,8 @@ public class UserServiceImpl implements UserService {
         if (userId == null || userId < 0) {
             throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
-        if(!isAdmin(request)){
-            throw new BusinessException(ErrorCode.NO_AUTH,"无权限");
+        if (!isAdmin(request)) {
+            throw new BusinessException(ErrorCode.NO_AUTH, "无权限");
         }
         toUpdate.setUserId(id);
         toUpdate.setUserName(userUpdateRequest.getUserName());
@@ -271,8 +336,28 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Page<User> recommend(long pageSize, long pageNum, HttpServletRequest request) {
-        return null;
+    public Page<User> recommend(Long pageSize, Long pageNum, HttpServletRequest request) {
+        if (pageSize == null || pageNum == null || request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = this.getCurrent(request);
+        String recommendKey = String.format("yupi:yupao:user:recommend:%s", loginUser.getUserId());
+        ValueOperations<Object, Object> valueOperations = redisTemplate.opsForValue();
+        Page<User> userPage = (Page<User>) valueOperations.get(recommendKey);
+        if (userPage != null) {
+            return userPage;
+        } else {
+            QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+            userPage = userMapper.selectPage(new Page<>(pageNum, pageSize), userQueryWrapper);
+            List<User> safeUsers = userPage.getRecords().stream().map(this::getSafeUser).toList();
+            userPage.setRecords(safeUsers);
+            try {
+                valueOperations.set(recommendKey, userPage, 30, TimeUnit.MINUTES);
+            } catch (Exception e) {
+                log.error("set redis key error,key={}", recommendKey, e);
+            }
+            return userPage;
+        }
     }
 
     private boolean isAdmin(HttpServletRequest request) {

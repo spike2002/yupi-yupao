@@ -64,6 +64,12 @@ public class UserController {
         return ResultUtils.success(list);
     }
 
+    @GetMapping("/search/tags")
+    public BaseResponse<List<User>> searchUsersByTags(List<String> tags, HttpServletRequest request) {
+        List<User> list = userService.searchUsersByTags(tags, request);
+        return ResultUtils.success(list);
+    }
+
     @PostMapping("/delet")
     public BaseResponse<Long> deleteUser(@RequestBody Long id, HttpServletRequest request) {
         Long res = userService.deleteUser(id, request);
@@ -103,8 +109,14 @@ public class UserController {
 //    }
 
     @GetMapping("/recommend")
-    public BaseResponse<Page<User>> recommend(long pageSize,long pageNum,HttpServletRequest request){
-        Page<User> userPage=userService.recommend(pageSize,pageNum,request);
+    public BaseResponse<Page<User>> recommend(Long pageSize, Long pageNum, HttpServletRequest request) {
+        Page<User> userPage = userService.recommend(pageSize, pageNum, request);
         return ResultUtils.success(userPage);
+    }
+
+    @GetMapping("/match")
+    public BaseResponse<List<User>> match(Integer num, HttpServletRequest request) {
+        List<User> list = userService.match(num, request);
+        return ResultUtils.success(list);
     }
 }

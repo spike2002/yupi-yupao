@@ -36,5 +36,9 @@ public interface UserService {
 
     User updateUserByAdmin(UserUpdateRequest userUpdateRequest, Long id, HttpServletRequest request);
 
-    Page<User> recommend(long pageSize, long pageNum, HttpServletRequest request);
+    Page<User> recommend(Long pageSize, Long pageNum, HttpServletRequest request);
+
+    List<User> searchUsersByTags(List<String> tags, HttpServletRequest request);
+
+    List<User> match(Integer num, HttpServletRequest request);
 }
