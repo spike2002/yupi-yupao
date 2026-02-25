@@ -1,5 +1,6 @@
 package com.hsh.backend.service.impl;
 
+import java.lang.reflect.Type;
 import java.util.Date;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -220,25 +221,56 @@ public class UserServiceImpl implements UserService {
         if (num < 1 || num > 10) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "匹配用户数量不符合要求");
         }
+//        User loginUser = getCurrent(request);
+//        List<String> loginUserTags = gson.fromJson(loginUser.getTags(), new TypeToken<List<String>>() {
+//        }.getType());
+//        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+////        userQueryWrapper.select("user_id", "tags");
+//        userQueryWrapper.isNotNull("tags");
+//        List<User> userList = userMapper.selectList(userQueryWrapper);
+//        List<Pair<User, Integer>> list = new ArrayList<>();
+//        for (User user : userList) {
+//            List<String> tags = gson.fromJson(user.getTags(), new TypeToken<List<String>>() {
+//            }.getType());
+//            int distance = MinDistance.getMinDistance(tags, loginUserTags);
+//            list.add(Pair.of(user, distance));
+//        }
+//        //返回编辑距离从小到大排序的结果
+//        List<User> resList = list.stream().sorted((a, b) -> {
+//            return a.getSecond() - b.getSecond();
+//        }).map(Pair::getFirst).map(this::getSafeUser).limit(num).toList();
+//        return resList;
+        //大根堆优化版本
         User loginUser = getCurrent(request);
-        List<String> loginUserTags = gson.fromJson(loginUser.getTags(), new TypeToken<List<String>>() {
-        }.getType());
+        Type type = new TypeToken<List<String>>() {
+        }.getType();
+        //防止每个循环都新建一个实例
+        List<String> loginUserTags = gson.fromJson(loginUser.getTags(), type);
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
-//        userQueryWrapper.select("user_id", "tags");
         userQueryWrapper.isNotNull("tags");
+        //避免查到用户本人
+        userQueryWrapper.ne("user_id", loginUser.getUserId());
         List<User> userList = userMapper.selectList(userQueryWrapper);
-        List<Pair<User, Integer>> list = new ArrayList<>();
+        PriorityQueue<Pair<User, Integer>> maxHeap = new PriorityQueue<>((a, b) -> {
+            return b.getSecond() - a.getSecond();
+        });
         for (User user : userList) {
-            List<String> tags = gson.fromJson(user.getTags(), new TypeToken<List<String>>() {
-            }.getType());
+            List<String> tags = gson.fromJson(user.getTags(), type);
             int distance = MinDistance.getMinDistance(tags, loginUserTags);
-            list.add(Pair.of(user, distance));
+            if (maxHeap.size() <= 10) {
+                maxHeap.offer(Pair.of(user, distance));
+            } else {
+                if(distance<maxHeap.peek().getSecond()){
+                    maxHeap.poll();
+                    maxHeap.offer(Pair.of(user, distance));
+                }
+            }
         }
         //返回编辑距离从小到大排序的结果
-        List<User> resList = list.stream().sorted((a, b) -> {
+        List<User> list = maxHeap.stream().sorted((a, b) -> {
             return a.getSecond() - b.getSecond();
-        }).map(Pair::getFirst).map(this::getSafeUser).limit(num).toList();
-        return resList;
+        }).limit(num).map(Pair::getFirst).map(this::getSafeUser).toList();
+        return list;
     }
 
     @Override
