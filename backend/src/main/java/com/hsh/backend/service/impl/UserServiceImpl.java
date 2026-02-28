@@ -50,7 +50,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private static final String SALT = "hsh";
     private final ObjectMapper objectMapper;
-    private final RedisTemplate<Object, Object> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private static final Gson gson = new Gson();
 //构造函数和@RequiredArgsConstructor冲突，因为@RequiredArgsConstructor注解会扫描final字段并自动生成构造函数，相同的构造函数会造成冲突
 //    public UserServiceImpl(UserMapper userMapper) {
@@ -198,12 +198,12 @@ public class UserServiceImpl implements UserService {
         }
         //其实写到这里也可以了，这样就是模糊查询，比如搜java会出来javascript，下面的话就是完全匹配查询
         List<User> userList = userMapper.selectList(userQueryWrapper);
-        userList.stream().filter(user -> {
-            HashSet<User> tempSet = gson.fromJson(user.getTags(), new TypeToken<Set<String>>() {
+        List<User> resList = userList.stream().filter(user -> {
+            HashSet<String> tempSet = gson.fromJson(user.getTags(), new TypeToken<Set<String>>() {
             }.getType());
             return tempSet.containsAll(tags);
         }).map(this::getSafeUser).toList();
-        return userList;
+        return resList;
     }
 
     /**
@@ -248,6 +248,8 @@ public class UserServiceImpl implements UserService {
         List<String> loginUserTags = gson.fromJson(loginUser.getTags(), type);
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
         userQueryWrapper.isNotNull("tags");
+        //空值保护，不然""空字符串gson序列化的时候会序列化成null，后续MinDistance.getMinDistance()会报NPE
+        userQueryWrapper.ne("tags","");
         //避免查到用户本人
         userQueryWrapper.ne("user_id", loginUser.getUserId());
         List<User> userList = userMapper.selectList(userQueryWrapper);
@@ -260,7 +262,7 @@ public class UserServiceImpl implements UserService {
             if (maxHeap.size() <= 10) {
                 maxHeap.offer(Pair.of(user, distance));
             } else {
-                if(distance<maxHeap.peek().getSecond()){
+                if (distance < maxHeap.peek().getSecond()) {
                     maxHeap.poll();
                     maxHeap.offer(Pair.of(user, distance));
                 }
@@ -374,7 +376,7 @@ public class UserServiceImpl implements UserService {
         }
         User loginUser = this.getCurrent(request);
         String recommendKey = String.format("yupi:yupao:user:recommend:%s", loginUser.getUserId());
-        ValueOperations<Object, Object> valueOperations = redisTemplate.opsForValue();
+        ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
         Page<User> userPage = (Page<User>) valueOperations.get(recommendKey);
         if (userPage != null) {
             return userPage;

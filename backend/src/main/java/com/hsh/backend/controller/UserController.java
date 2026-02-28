@@ -65,7 +65,7 @@ public class UserController {
     }
 
     @GetMapping("/search/tags")
-    public BaseResponse<List<User>> searchUsersByTags(List<String> tags, HttpServletRequest request) {
+    public BaseResponse<List<User>> searchUsersByTags(@RequestParam List<String> tags, HttpServletRequest request) {
         List<User> list = userService.searchUsersByTags(tags, request);
         return ResultUtils.success(list);
     }
