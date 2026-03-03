@@ -41,4 +41,6 @@ public interface UserService {
     List<User> searchUsersByTags(List<String> tags, HttpServletRequest request);
 
     List<User> match(Integer num, HttpServletRequest request);
+
+    boolean isAdmin(HttpServletRequest request);
 }

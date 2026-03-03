@@ -8,7 +8,6 @@ import lombok.NonNull;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-
 public class UserRegisterRequest {
     /**
      * 用户账号

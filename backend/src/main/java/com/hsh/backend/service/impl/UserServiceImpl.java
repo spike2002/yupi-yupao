@@ -1,7 +1,6 @@
 package com.hsh.backend.service.impl;
 
 import java.lang.reflect.Type;
-import java.util.Date;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -17,8 +16,6 @@ import com.hsh.backend.mapper.UserMapper;
 import com.hsh.backend.model.request.UserUpdateRequest;
 import com.hsh.backend.service.UserService;
 import com.hsh.backend.utils.MinDistance;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.models.security.SecurityScheme;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +29,6 @@ import org.springframework.util.DigestUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static com.hsh.backend.constant.UserConstant.ADMIN_ROLE;
 import static com.hsh.backend.constant.UserConstant.USER_LOGIN_STATE;
@@ -394,7 +390,7 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    private boolean isAdmin(HttpServletRequest request) {
+    public boolean isAdmin(HttpServletRequest request) {
         User user = this.getCurrent(request);
         return user != null && user.getUserRole() == ADMIN_ROLE;
     }

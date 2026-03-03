@@ -2,6 +2,9 @@ package com.hsh.backend.service;
 
 import com.hsh.backend.model.entity.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.hsh.backend.model.request.TeamAddRequest;
+import com.hsh.backend.model.request.TeamUpdateRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
 * @author 24496
@@ -10,4 +13,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 */
 public interface TeamService extends IService<Team> {
 
+    Long addTeam(TeamAddRequest teamAddRequest, HttpServletRequest request);
+
+    Long updateTeam(TeamUpdateRequest teamUpdateRequest, HttpServletRequest request);
 }

@@ -11,11 +11,12 @@ import com.hsh.backend.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Log4j2
+@Slf4j
 @Tag(name = "UserController")
 @RestController
 @RequestMapping("/user")

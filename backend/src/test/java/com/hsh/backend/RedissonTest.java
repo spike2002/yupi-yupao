@@ -1,6 +1,8 @@
 package com.hsh.backend;
+import java.util.Date;
 
 import com.hsh.backend.model.entity.User;
+import com.hsh.backend.model.request.TeamAddRequest;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RList;
 import org.redisson.api.RedissonClient;
@@ -37,5 +39,15 @@ public class RedissonTest {
         forHash.put("test5","user1",user);
         forHash.put("test5","user2",user);
         System.out.println(valueOperations.get("test1"));
+        System.out.println("测试字符串长度".length());
+        TeamAddRequest teamAddRequest = new TeamAddRequest();
+        teamAddRequest.setMaxNum(0);
+        teamAddRequest.setExpireTime(new Date());
+        teamAddRequest.setUserId(0L);
+        teamAddRequest.setPassword("");
+        System.out.println(teamAddRequest.getName());
+        System.out.println(teamAddRequest.getDescription());
+        System.out.println(teamAddRequest.getStatus());
+        System.out.println(new Date());
     }
 }
