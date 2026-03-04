@@ -1,16 +1,22 @@
-package com.hsh.backend.model.request;
+package com.hsh.backend.model.dto;
 
-
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class TeamAddRequest {
+public class TeamQuery {
+    /**
+     * id
+     */
+    private Long teamId;
+
+    /**
+     * idList
+     */
+    private List<Long> idList;
+
     /**
      * 队伍名称
      */
@@ -31,10 +37,10 @@ public class TeamAddRequest {
      */
     private Date expireTime;
 
-//    /**
-//     * 用户id（队长 id）
-//     */
-//    private Long userId;
+    /**
+     * 用户id（队长 id）
+     */
+    private Long userId;
 
     /**
      * 0 - 公开，1 - 私有，2 - 加密
@@ -45,5 +51,4 @@ public class TeamAddRequest {
      * 密码
      */
     private String password;
-
 }

@@ -43,4 +43,6 @@ public interface UserService {
     List<User> match(Integer num, HttpServletRequest request);
 
     boolean isAdmin(HttpServletRequest request);
+
+    User getSafeUser(User user);
 }

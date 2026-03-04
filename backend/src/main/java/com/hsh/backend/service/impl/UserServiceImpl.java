@@ -245,7 +245,7 @@ public class UserServiceImpl implements UserService {
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
         userQueryWrapper.isNotNull("tags");
         //空值保护，不然""空字符串gson序列化的时候会序列化成null，后续MinDistance.getMinDistance()会报NPE
-        userQueryWrapper.ne("tags","");
+        userQueryWrapper.ne("tags", "");
         //避免查到用户本人
         userQueryWrapper.ne("user_id", loginUser.getUserId());
         List<User> userList = userMapper.selectList(userQueryWrapper);
@@ -399,7 +399,7 @@ public class UserServiceImpl implements UserService {
         return user != null && user.getUserRole() == ADMIN_ROLE;
     }
 
-    private User getSafeUser(User user) {
+    public User getSafeUser(User user) {
         if (user == null) {
             return null;
         }

@@ -1,10 +1,14 @@
 package com.hsh.backend.service;
 
+import com.hsh.backend.model.dto.TeamQuery;
 import com.hsh.backend.model.entity.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.hsh.backend.model.request.TeamAddRequest;
 import com.hsh.backend.model.request.TeamUpdateRequest;
+import com.hsh.backend.model.vo.TeamListVo;
 import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.List;
 
 /**
 * @author 24496
@@ -16,4 +20,6 @@ public interface TeamService extends IService<Team> {
     Long addTeam(TeamAddRequest teamAddRequest, HttpServletRequest request);
 
     Long updateTeam(TeamUpdateRequest teamUpdateRequest, HttpServletRequest request);
+
+    List<TeamListVo> listTeams(TeamQuery teamQuery, HttpServletRequest request);
 }
