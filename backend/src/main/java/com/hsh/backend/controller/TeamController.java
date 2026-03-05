@@ -1,6 +1,7 @@
 package com.hsh.backend.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hsh.backend.common.BaseResponse;
 import com.hsh.backend.common.ResultUtils;
 import com.hsh.backend.mapper.UserTeamMapper;
@@ -9,6 +10,7 @@ import com.hsh.backend.model.entity.User;
 import com.hsh.backend.model.entity.UserTeam;
 import com.hsh.backend.model.request.TeamAddRequest;
 import com.hsh.backend.model.request.TeamUpdateRequest;
+import com.hsh.backend.model.vo.TeamDetailVo;
 import com.hsh.backend.model.vo.TeamListVo;
 import com.hsh.backend.service.TeamService;
 import com.hsh.backend.service.UserService;
@@ -16,10 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Set;
@@ -53,26 +52,33 @@ public class TeamController {
         return ResultUtils.success(res);
     }
 
-    @PostMapping("/list")
+    @GetMapping("/list")
     public BaseResponse<List<TeamListVo>> listTeams(@RequestBody TeamQuery teamQuery, HttpServletRequest request) {
-        //Controller 层实现插入hasJoin
         List<TeamListVo> list = teamService.listTeams(teamQuery, request);
-        if(CollectionUtils.isEmpty(list)){
-            return ResultUtils.success(list);
-        }
-        User loginUser = userService.getCurrent(request);
-        Long userId = loginUser.getUserId();
-//        list.forEach(teamVo -> teamVo.getTeamId());
-        List<Long> teamIdList = list.stream().map(teamListVo -> teamListVo.getTeamId()).toList();
-        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
-        userTeamQueryWrapper.eq("user_id", userId);
-        userTeamQueryWrapper.in("team_id", teamIdList);
-        List<UserTeam> userTeams = userTeamMapper.selectList(userTeamQueryWrapper);
-        Set<Long> hasJoinIdList = userTeams.stream().map(userTeam -> userTeam.getTeamId()).collect(Collectors.toSet());
-        list.forEach(teamListVo -> {
-            boolean hasJoin = hasJoinIdList.contains(teamListVo.getTeamId());
-            teamListVo.setHasJoin(hasJoin);
-        });
         return ResultUtils.success(list);
+    }
+
+    @GetMapping("/list/page")
+    public BaseResponse<Page<TeamListVo>> listTeamsByPage(@RequestBody TeamQuery teamQuery, HttpServletRequest request, @RequestParam Integer pageNum, @RequestParam Integer pageSize) {
+        Page<TeamListVo> page = teamService.listTeamsByPage(teamQuery, request, pageNum, pageSize);
+        return ResultUtils.success(page);
+    }
+
+    @GetMapping("/list/mycreate")
+    public BaseResponse<List<TeamListVo>> listMyCreateTeams(@RequestBody TeamQuery teamQuery, HttpServletRequest request) {
+        List<TeamListVo> list = teamService.listMyCreateTeams(teamQuery, request);
+        return ResultUtils.success(list);
+    }
+
+    @GetMapping("/list/myjoin")
+    public BaseResponse<List<TeamListVo>> listMyJoinTeams(@RequestBody TeamQuery teamQuery, HttpServletRequest request) {
+        List<TeamListVo> list = teamService.listMyJoinTeams(teamQuery, request);
+        return ResultUtils.success(list);
+    }
+
+    @GetMapping("/getdetail")
+    public BaseResponse<TeamDetailVo> getTeamDetailById(Long teamId, HttpServletRequest request) {
+        TeamDetailVo teamDetailVo=teamService.getTeamDetailById(teamId,request);
+        return ResultUtils.success(teamDetailVo);
     }
 }

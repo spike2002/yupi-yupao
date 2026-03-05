@@ -1,6 +1,7 @@
 package com.hsh.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hsh.backend.common.ErrorCode;
 import com.hsh.backend.exception.BusinessException;
@@ -13,6 +14,7 @@ import com.hsh.backend.model.entity.UserTeam;
 import com.hsh.backend.model.enums.TeamStatusEnum;
 import com.hsh.backend.model.request.TeamAddRequest;
 import com.hsh.backend.model.request.TeamUpdateRequest;
+import com.hsh.backend.model.vo.TeamDetailVo;
 import com.hsh.backend.model.vo.TeamListVo;
 import com.hsh.backend.service.TeamService;
 import com.hsh.backend.mapper.TeamMapper;
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.hsh.backend.model.enums.TeamStatusEnum.PRIVATE;
 import static com.hsh.backend.model.enums.TeamStatusEnum.getTeamStatusEnumByCode;
@@ -215,6 +218,108 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         if (loginUser == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
+        //1.参数校验，组装sql
+        QueryWrapper<Team> queryWrapper = getQuery(teamQuery);
+        //2.查询数据
+        List<Team> teams = teamMapper.selectList(queryWrapper);
+        if (teams == null) {
+            return new ArrayList<>();
+        }
+        //3.插入createUser，插入hasJoinNum
+        List<TeamListVo> teamListVos = convertTeamToTeamListVo(teams);
+        //4.插入hasJoin字段
+        addHasJoinToTeamListVo(teamListVos, request);
+        return teamListVos;
+    }
+
+    @Override
+    public Page<TeamListVo> listTeamsByPage(TeamQuery teamQuery, HttpServletRequest request, Integer pageNum, Integer pageSize) {
+        if (teamQuery == null || request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        User loginUser = userService.getCurrent(request);
+        if (loginUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
+        }
+        if (pageSize > 50) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "分页大小不能大于50");
+        }
+        //1.参数校验，组装sql
+        QueryWrapper<Team> queryWrapper = getQuery(teamQuery);
+        //2.查询数据
+        Page<Team> teamPages = teamMapper.selectPage(new Page<>(pageNum, pageSize), queryWrapper);
+        //3.插入createUser，插入hasJoinNum
+        List<Team> records = teamPages.getRecords();
+        List<TeamListVo> teamListVos = convertTeamToTeamListVo(records);
+        //4.插入hasJoin字段
+        addHasJoinToTeamListVo(teamListVos, request);
+        Page<TeamListVo> page = new Page<>(pageNum, pageSize);
+        page.setRecords(teamListVos);
+        page.setTotal(teamListVos.size());
+        return page;
+    }
+
+    @Override
+    public List<TeamListVo> listMyCreateTeams(TeamQuery teamQuery, HttpServletRequest request) {
+        if (teamQuery == null || request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        User loginUser = userService.getCurrent(request);
+        if (loginUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
+        }
+        teamQuery.setUserId(loginUser.getUserId());
+        return listTeams(teamQuery, request);
+    }
+
+    @Override
+    public List<TeamListVo> listMyJoinTeams(TeamQuery teamQuery, HttpServletRequest request) {
+        if (teamQuery == null || request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        User loginUser = userService.getCurrent(request);
+        if (loginUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
+        }
+        QueryWrapper<UserTeam> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_id", loginUser.getUserId());
+        queryWrapper.select("team_id");
+        List<UserTeam> userTeams = userTeamMapper.selectList(queryWrapper);
+        if (CollectionUtils.isEmpty(userTeams)) {
+            return new ArrayList<>();
+        }
+        List<Long> list = userTeams.stream().map(UserTeam::getTeamId).toList();
+        teamQuery.setIdList(list);
+        return listTeams(teamQuery, request);
+    }
+
+    @Override
+    public TeamDetailVo getTeamDetailById(Long teamId, HttpServletRequest request) {
+        if (teamId == null || request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        Team team = teamMapper.selectById(teamId);
+        if (team == null) {
+            return null;
+        }
+        TeamDetailVo teamDetailVo = new TeamDetailVo();
+        BeanUtils.copyProperties(team, teamDetailVo);
+        Long userId = team.getUserId();
+        User user = userMapper.selectById(userId);
+        teamDetailVo.setCreateUser(userService.getSafeUser(user));
+        QueryWrapper<UserTeam> userTeamWrapper = new QueryWrapper<>();
+        userTeamWrapper.eq("team_id", teamId).ne("user_id", userId).select("user_id");
+        List<UserTeam> userTeams = userTeamMapper.selectList(userTeamWrapper);
+        List<Long> userIdList = userTeams.stream().map(UserTeam::getUserId).toList();
+        QueryWrapper<User> userWrapper = new QueryWrapper<>();
+        userWrapper.in("user_id", userIdList);
+        List<User> userList = userMapper.selectList(userWrapper);
+        List<User> safeUserList = userList.stream().map(userService::getSafeUser).toList();
+        teamDetailVo.setUserList(safeUserList);
+        return teamDetailVo;
+    }
+
+    private QueryWrapper<Team> getQuery(TeamQuery teamQuery) {
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
         //1.参数校验，组装sql
         Long teamId = teamQuery.getTeamId();
@@ -245,17 +350,20 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         Date expireTime = teamQuery.getExpireTime();
         if (expireTime != null) {
             queryWrapper.and(i -> i.gt("expire_time", expireTime).or().isNull("expire_time"));
-        } else {
+        }
+        //如果前面的条件全都意外没加上的话,这里会把所有没过期的队伍查出来
+        //但是我又学习到如果没有查询条件，查出来所有数据这件事是合理的
+        else {
             //默认过滤过期队伍
             queryWrapper.and(i -> i.gt("expire_time", new Date()).or().isNull("expire_time"));
         }
-        List<Team> teams = teamMapper.selectList(queryWrapper);
-        if (teams == null) {
-            return new ArrayList<>();
-        }
+        return queryWrapper;
+    }
+
+    private List<TeamListVo> convertTeamToTeamListVo(List<Team> teams) {
         ArrayList<TeamListVo> list = new ArrayList<>();
         //3.插入createUser，插入hasJoinNum
-        //4.插入hasJoin在Contoller层实现，因为并不通用
+        //4.插入hasJoin在单独分离出来一个方法，因为并不通用
         for (Team team : teams) {
             TeamListVo teamListVo = new TeamListVo();
             BeanUtils.copyProperties(team, teamListVo);
@@ -272,8 +380,21 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         return list;
     }
+
+    private void addHasJoinToTeamListVo(List<TeamListVo> teamListVos, HttpServletRequest request) {
+        //插入 hasJoin 字段
+        User loginUser = userService.getCurrent(request);
+        Long userId = loginUser.getUserId();
+//        list.forEach(teamVo -> teamVo.getTeamId());
+        List<Long> teamIdList = teamListVos.stream().map(teamListVo -> teamListVo.getTeamId()).toList();
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        userTeamQueryWrapper.eq("user_id", userId);
+        userTeamQueryWrapper.in("team_id", teamIdList);
+        List<UserTeam> userTeams = userTeamMapper.selectList(userTeamQueryWrapper);
+        Set<Long> hasJoinIdList = userTeams.stream().map(userTeam -> userTeam.getTeamId()).collect(Collectors.toSet());
+        teamListVos.forEach(teamListVo -> {
+            boolean hasJoin = hasJoinIdList.contains(teamListVo.getTeamId());
+            teamListVo.setHasJoin(hasJoin);
+        });
+    }
 }
-
-
-
-
